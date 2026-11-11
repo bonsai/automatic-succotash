@@ -1,0 +1,50 @@
+name: 06 - AI implementation handoff (no autonomous execution)
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue approved for implementation planning"
+        required: true
+        type: number
+      approval:
+        description: "Enter PLAN-ONLY to create a handoff artifact"
+        required: true
+        type: string
+
+permissions:
+  issues: read
+  contents: read
+
+jobs:
+  handoff:
+    if: github.ref == 'refs/heads/main' && inputs.approval == 'PLAN-ONLY'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture issue as an agent handoff artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh issue view "$ISSUE_NUMBER" --repo "$REPOSITORY" --json number,title,body,labels,url > issue.json
+          {
+            echo "# Agent implementation handoff"
+            echo
+            echo "Status: planning only; no code execution or repository writes authorized."
+            echo
+            echo '## Source issue'
+            jq -r '"- Issue: #\(.number) — \(.title)\n- URL: \(.url)\n\n## Request\n\(.body // "(empty)")"' issue.json
+            echo
+            echo "## Required before implementation"
+            echo "- Human-approved acceptance criteria"
+            echo "- Explicit repository/branch scope"
+            echo "- Test and evidence requirements"
+            echo "- Secret and tool permission review"
+          } > handoff.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: implementation-handoff
+          path: handoff.md
+          if-no-files-found: error
