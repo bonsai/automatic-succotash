@@ -1,0 +1,54 @@
+name: 02 - Backup to S3 (disabled until configured)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate configuration only; do not transfer data"
+        type: boolean
+        required: true
+        default: true
+  schedule:
+    - cron: "25 18 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-s3
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.event_name == 'workflow_dispatch' || vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit backup contract
+        shell: bash
+        env:
+          BACKUP_HOST: ${{ vars.BACKUP_HOST }}
+          BACKUP_USER: ${{ vars.BACKUP_USER }}
+          BACKUP_COMMAND: ${{ vars.BACKUP_COMMAND }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          for name in BACKUP_HOST BACKUP_USER BACKUP_COMMAND S3_BUCKET AWS_REGION; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required repository variable: $name"
+              exit 1
+            fi
+          done
+      - name: Dry-run notice
+        if: inputs.dry_run == true && github.event_name == 'workflow_dispatch'
+        run: echo "Configuration validated. No backup or transfer was performed."
+      - name: Stop scheduled run until backup is implemented
+        if: github.event_name == 'schedule'
+        run: |
+          echo "::error::Scheduled backup is intentionally blocked until encryption, retention and restore verification are implemented."
+          exit 1
+      - name: Block manual transfer until backup is implemented
+        if: inputs.dry_run != true && github.event_name == 'workflow_dispatch'
+        run: |
+          echo "::error::Backup transfer is intentionally not implemented yet. Define dump format, retention, encryption and restore test first."
+          exit 1

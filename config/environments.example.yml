@@ -1,0 +1,25 @@
+# Copy and adapt after confirming the real infrastructure.
+# This file contains identifiers only; never put credentials here.
+application:
+  source_repository: "TBD"
+  framework: "Vue.js + Laravel (unverified)"
+  build_artifact: "TBD"
+sakura:
+  host: "TBD"
+  user: "TBD"
+  document_root: "TBD"
+  ssh_host_key_verified: false
+backup:
+  enabled: false
+  database_dump_format: "TBD"
+  encryption: "TBD"
+  retention_days: null
+  restore_tested: false
+aws:
+  bucket: "TBD"
+  region: "TBD"
+azure:
+  subscription: "TBD"
+  resource_group: "TBD"
+  container_apps_job: "TBD"
+  functions_app: "TBD"

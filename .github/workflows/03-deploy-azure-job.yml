@@ -1,0 +1,46 @@
+name: 03 - Build and update Azure Container Apps Job (gated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate configuration only"
+        type: boolean
+        required: true
+        default: true
+      confirm:
+        description: "For a real update, enter UPDATE"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-job:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: azure-staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Azure configuration
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          IMAGE_NAME: ${{ vars.IMAGE_NAME }}
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          JOB_NAME: ${{ vars.CONTAINER_APP_JOB_NAME }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          for value in "$AZURE_CREDENTIALS" "$ACR_NAME" "$IMAGE_NAME" "$RESOURCE_GROUP" "$JOB_NAME"; do
+            test -n "$value" || { echo "::error::Azure configuration is incomplete"; exit 1; }
+          done
+          if [[ "$DRY_RUN" != "true" && "$CONFIRM" != "UPDATE" ]]; then
+            echo "::error::A real update requires confirm=UPDATE"; exit 1
+          fi
+      - name: Report scaffold status
+        run: |
+          echo "Azure build/update commands are intentionally pending the container context, registry and job contract."
+          echo "Do not add production credentials until docs/secrets.md is completed."
