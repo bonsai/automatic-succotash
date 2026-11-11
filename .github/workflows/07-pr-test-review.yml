@@ -32,16 +32,15 @@ jobs:
           if printf '%s\n' "$changed" | grep -E '(^|/)(\.env|id_rsa|.*\.pem)$'; then
             echo "::error::Potential secret/private-key file in PR"; exit 1
           fi
-      - name: Validate workflow YAML
+      - name: Install YAML parser
+        run: python -m pip install --disable-pip-version-check PyYAML
+      - name: Validate workflow YAML syntax
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          try:
-              import yaml
-          except ImportError:
-              raise SystemExit("PyYAML unavailable")
-          for path in Path(".github/workflows").glob("*.yml"):
+          import yaml
+          for path in sorted(Path(".github/workflows").glob("*.yml")):
               yaml.safe_load(path.read_text(encoding="utf-8"))
               print(f"OK {path}")
           PY
