@@ -1,0 +1,47 @@
+name: 07 - PR validation and review gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate changed-file safety
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA"...HEAD
+          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -E '(^|/)(\.env|id_rsa|.*\.pem)$'; then
+            echo "::error::Potential secret/private-key file in PR"; exit 1
+          fi
+      - name: Validate workflow YAML
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          try:
+              import yaml
+          except ImportError:
+              raise SystemExit("PyYAML unavailable")
+          for path in Path(".github/workflows").glob("*.yml"):
+              yaml.safe_load(path.read_text(encoding="utf-8"))
+              print(f"OK {path}")
+          PY
