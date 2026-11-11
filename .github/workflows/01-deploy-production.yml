@@ -1,0 +1,71 @@
+name: 01 - Deploy production (gated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run rsync in dry-run mode"
+        type: boolean
+        required: true
+        default: true
+      confirm:
+        description: "For a real deploy, enter DEPLOY"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate deployment gate
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$DRY_RUN" != "true" && "$CONFIRM" != "DEPLOY" ]]; then
+            echo "::error::A real deployment requires confirm=DEPLOY."
+            exit 1
+          fi
+          if [[ -z "${{ vars.DEPLOY_HOST }}" || -z "${{ vars.DEPLOY_USER }}" || -z "${{ vars.DEPLOY_PATH }}" ]]; then
+            echo "::error::Configure DEPLOY_HOST, DEPLOY_USER and DEPLOY_PATH."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - name: Prepare SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Validate source and destination
+        run: |
+          set -euo pipefail
+          test -d .
+          printf 'Target: %s@%s:%s\n' "${{ vars.DEPLOY_USER }}" "${{ vars.DEPLOY_HOST }}" "${{ vars.DEPLOY_PATH }}"
+      - name: Rsync (no remote deletion)
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          args=(-az --itemize-changes -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes")
+          if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          rsync "${args[@]}" ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
