@@ -40,9 +40,14 @@ jobs:
             fi
           done
       - name: Dry-run notice
-        if: inputs.dry_run == true || github.event_name == 'schedule'
-        run: echo "Validation only. Configure a reviewed backup implementation before enabling transfers."
-      - name: Block unimplemented transfer
+        if: inputs.dry_run == true && github.event_name == 'workflow_dispatch'
+        run: echo "Configuration validated. No backup or transfer was performed."
+      - name: Stop scheduled run until backup is implemented
+        if: github.event_name == 'schedule'
+        run: |
+          echo "::error::Scheduled backup is intentionally blocked until encryption, retention and restore verification are implemented."
+          exit 1
+      - name: Block manual transfer until backup is implemented
         if: inputs.dry_run != true && github.event_name == 'workflow_dispatch'
         run: |
           echo "::error::Backup transfer is intentionally not implemented yet. Define dump format, retention, encryption and restore test first."
