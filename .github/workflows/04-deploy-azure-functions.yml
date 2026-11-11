@@ -1,0 +1,45 @@
+name: 04 - Deploy Azure Functions (gated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate only"
+        type: boolean
+        required: true
+        default: true
+      confirm:
+        description: "For a real deploy, enter DEPLOY"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-functions:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: azure-staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Functions deployment contract
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          APP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          PACKAGE_PATH: ${{ vars.FUNCTIONS_PACKAGE_PATH }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test -n "$APP_NAME" || { echo "::error::Set AZURE_FUNCTIONAPP_NAME"; exit 1; }
+          test -n "$PACKAGE_PATH" || { echo "::error::Set FUNCTIONS_PACKAGE_PATH"; exit 1; }
+          if [[ "$DRY_RUN" != "true" && "$CONFIRM" != "DEPLOY" ]]; then
+            echo "::error::A real deployment requires confirm=DEPLOY"; exit 1
+          fi
+          if [[ "$DRY_RUN" != "true" ]]; then
+            test -n "$PUBLISH_PROFILE" || { echo "::error::Missing publish profile"; exit 1; }
+            test -d "$PACKAGE_PATH" || { echo "::error::Package path does not exist"; exit 1; }
+          fi
+      - name: Report scaffold status
+        run: echo "Select and pin the Functions runtime/build action after the application runtime is confirmed."
