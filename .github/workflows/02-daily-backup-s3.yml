@@ -24,8 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Require explicit backup contract
+        shell: bash
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          BACKUP_HOST: ${{ vars.BACKUP_HOST }}
+          BACKUP_USER: ${{ vars.BACKUP_USER }}
+          BACKUP_COMMAND: ${{ vars.BACKUP_COMMAND }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           set -euo pipefail
           for name in BACKUP_HOST BACKUP_USER BACKUP_COMMAND S3_BUCKET AWS_REGION; do
@@ -34,13 +39,6 @@ jobs:
               exit 1
             fi
           done
-        shell: bash
-        env:
-          BACKUP_HOST: ${{ vars.BACKUP_HOST }}
-          BACKUP_USER: ${{ vars.BACKUP_USER }}
-          BACKUP_COMMAND: ${{ vars.BACKUP_COMMAND }}
-          S3_BUCKET: ${{ vars.S3_BUCKET }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
       - name: Dry-run notice
         if: inputs.dry_run == true || github.event_name == 'schedule'
         run: echo "Validation only. Configure a reviewed backup implementation before enabling transfers."
